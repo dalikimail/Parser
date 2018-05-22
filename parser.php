@@ -12,7 +12,7 @@
 * C: \"([^\"]+)\" - находит то, что заключено в кавычки
 * D: (\S+) - текст без пробелов
 *
-**/
+*/
 
 class Parser
 {
@@ -58,7 +58,7 @@ class Parser
 	* @param string $filePath
 	* @param int $numberOfStrings
 	*/
-	function __construct(string $filePath, int $numberOfStrings) 
+	function __construct($filePath, $numberOfStrings) 
 	{
 		$this->filePath = $filePath; // Получаем путь к файлу
 		$this->openedFile = @fopen($this->filePath, "r"); // Открываем файл для чтения
@@ -84,9 +84,9 @@ class Parser
 	/**
 	* @param int $status
 	*/
-	private function addStatusToList(int $status)
+	private function addStatusToList($status)
 	{
-		if (array_key_exists($status, $this->statusList[]))
+		if (array_key_exists($status, $this->statusList))
 		{
 			$this->statusList[$status]++;
 		}
@@ -100,7 +100,7 @@ class Parser
 	/**
 	* @param string $userAgent
 	*/
-	private function tryToAddSpider(string $userAgent)
+	private function tryToAddSpider($userAgent)
 	{
 		if ($this->isSpider($userAgent))
 		{
@@ -113,7 +113,7 @@ class Parser
 	* @param string $stringFromFile
 	* @return mixed
 	*/
-	private function parseString(string $stringFromFile)
+	private function parseString($stringFromFile)
 	{
 		$result = [];
 		
@@ -159,7 +159,7 @@ class Parser
 	* @param string $ip
 	* @return int
 	*/
-	private function convertIpToInt (string $ip)
+	private function convertIpToInt($ip)
 	{
 		$ipPart = explode('.', $ip);
 		$result = $ipPart[0] * 16777216
@@ -174,7 +174,7 @@ class Parser
 	* @param string $userAgent
 	* @return bool
 	*/
-	private function isSpider(string $userAgent)
+	private function isSpider($userAgent)
 	{
 		$isBot = false;
 		
@@ -204,12 +204,12 @@ class Parser
 }
 
 // Для запуска из под командной строки
-if (count($argv) > 1) 
+if (isset($argv[1])) 
 {
 	$filePath = $argv[1];
-	$limit = (count($argv) > 2 ?  $argv[2] : PHP_INT_MAX); // Если передан лимит на количество обрабатываемых строк
-	$parser = new Parser($filePath, $limit); // Парсер отрабатывает сразу на старте
-	$output = $parser->makeJsonOutput(); // Выводим в формате, который требовался, можно добавить, скажем, функцию с serialize выводом, вместо json
+	$limit = (count($argv) > 2 ?  $argv[2] : PHP_INT_MAX);
+	$parser = new Parser($filePath, $limit); 
+	$output = $parser->makeJsonOutput();
 	
 	echo $output;
 }
@@ -218,9 +218,9 @@ if (count($argv) > 1)
 if (array_key_exists('file', $_GET)) 
 {
 	$filePath = $_GET['file'];
-	$limit = (array_key_exists('limit', $_GET) ? $_GET['limit'] : PHP_INT_MAX); // Если передан лимит на количество обрабатываемых строк
-	$parser = new Parser($filePath, $limit); // Парсер отрабатывает сразу на старте
-	$output = $parser->makeJsonOutput(); // Выводим в формате, который требовался, можно добавить, скажем, функцию с serialize выводом, вместо json
+	$limit = (array_key_exists('limit', $_GET) ? $_GET['limit'] : PHP_INT_MAX);
+	$parser = new Parser($filePath, $limit); 
+	$output = $parser->makeJsonOutput();
 	
 	echo $output;
 }
