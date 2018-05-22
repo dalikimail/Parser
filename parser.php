@@ -34,31 +34,38 @@ class Parser
 	const QUOTES = '\"(.+?)[^\134]\"';
 	const NOWHITESPACE = '(\S+)';
 
-	/* Выводим все в формате JSON */
-	public function jsonPrint()
+	// Забираем данные в формате JSON
+	/**
+	* @return json array
+	*/
+	public function makeJsonOutput()
 	{
-		$json_array = array();
+		$jsonResult = [];
 		
-		$json_array['viewsCount'] = $this->viewsCount;
-		$json_array['urls'] = count($this->uniqueUrlList);
-		$json_array['ips'] = count($this->uniqueIpList);
-		$json_array['trafficCount'] = $this->trafficCount;
-		$json_array['crawlers'] = $this->spidersList;
-		$json_array['statusCodes'] = $this->statusList;
+		$jsonResult['viewsCount'] = $this->viewsCount;
+		$jsonResult['urls'] = count($this->uniqueUrlList);
+		$jsonResult['ips'] = count($this->uniqueIpList);
+		$jsonResult['trafficCount'] = $this->trafficCount;
+		$jsonResult['crawlers'] = $this->spidersList;
+		$jsonResult['statusCodes'] = $this->statusList;
 		
-		$json_array = json_encode($json_array);
+		$jsonResult = json_encode($jsonResult);
 		
-		echo $json_array;
+		return $jsonResult;
 	}
 	
-	function __construct($path, $number_of_strings) 
+	/**
+	* @param string $filePath
+	* @param int $numberOfStrings
+	*/
+	function __construct(string $filePath, int $numberOfStrings) 
 	{
-		$this->filePath = $path; // Получаем путь к файлу
+		$this->filePath = $filePath; // Получаем путь к файлу
 		$this->openedFile = @fopen($this->filePath, "r"); // Открываем файл для чтения
-		$this->stringsLimit = $number_of_strings; // Читать не весь файл (для проверки скрипта)
+		$this->stringsLimit = $numberOfStrings; // Читать не весь файл (для проверки скрипта)
 		$this->regexRule = "/".self::BRACKETS."|".self::QUOTE_EMPTY."|".self::QUOTES."|".self::NOWHITESPACE."/"; // Шаблон поиска
 		
-		/* Инициализируем начальное состояние необходимых нам переменных */
+		// Инициализируем начальное состояние необходимых нам переменных
 		$this->viewsCount = 0;
 		$this->uniqueIpList = [];
 		$this->uniqueUrlList = [];
@@ -66,50 +73,108 @@ class Parser
 		$this->spidersList = array("Google" => 0, "Bing" => 0, "Baidu" => 0, "Yandex" => 0);
 		$this->statusList = [];
 		
-		/* Парсим файл, который нам скормили (защищаемся от несуществующего файла) */
+		// Парсим файл, который нам скормили (защищаемся от несуществующего файла) */
 		if ($this->openedFile)
 		{
 			$this->parseFile();
 		}
 	}
 	
-	/* Основной функционал парсера, запускается один раз */
+	// Добавить статус в массив статусов
+	/**
+	* @param int $status
+	*/
+	private function addStatusToList(int $status)
+	{
+		if (array_key_exists($status, $this->statusList[]))
+		{
+			$this->statusList[$status]++;
+		}
+		else
+		{
+			$this->statusList[$status] = 1;
+		}
+	}
+	
+	// Попытка добавить поискового бота в массив ботов
+	/**
+	* @param string $userAgent
+	*/
+	private function tryToAddSpider(string $userAgent)
+	{
+		if ($this->isSpider($userAgent))
+		{
+			$this->spidersList[$this->lastSpider]++;
+		}
+	}
+	
+	// Парсер строки
+	/**
+	* @param string $stringFromFile
+	* @return mixed
+	*/
+	private function parseString(string $stringFromFile)
+	{
+		$result = [];
+		
+		preg_match_all($this->regexRule, $stringFromFile, $pregmatchedString); 
+		$allMatchedData = $pregmatchedString[0]; 
+		
+		$result['ip'] = $allMatchedData[0];
+		$result['status'] = $allMatchedData[5];
+		$result['traffic'] = $allMatchedData[6];
+		$result['url'] = $allMatchedData[7];
+		$result['userAgent'] = $allMatchedData[8];
+		
+		return $result;
+	}
+	
+	// Парсер файла
 	private function parseFile() 
 	{
 		$currentString = fgets($this->openedFile);
+		
 		while ($currentString !== FALSE && $this->viewsCount < $this->stringsLimit) 
 		{
-			preg_match_all($this->regexRule, $currentString, $pregmatchedString); // Парсим файл по заданному ранее правилу
-			$allMatchedData = $pregmatchedString[0]; // У нас несколько групп, нам нужны попадания по всем группам
+			$parsedString = $this->parseString($currentString);
 			
-			$this->uniqueIpList[] = $this->convertIpToInt($allMatchedData[0]); // Храним IP как числа, а не строки
-			$this->uniqueUrlList[] = $allMatchedData[7]; // Записываем все url
-			$this->viewsCount++; // Увеличиваем счетчик
-			isset($this->statusList[$allMatchedData[5]]) ? $this->statusList[$allMatchedData[5]]++ : $this->statusList[$allMatchedData[5]] = 1; // Проверяем, что код ответа уже встречался, если нет, то создаем
-			!$this->isSpider($allMatchedData[8]) ?: $this->spidersList[$this->lastSpider]++; // Если это бот, то записываем его
-			$this->trafficCount += $allMatchedData[6]; // Суммируем трафик
+			$this->uniqueIpList[] = $this->convertIpToInt($parsedString['ip']);
+			$this->uniqueUrlList[] = $parsedString['url'];
+			$this->viewsCount++;
+			$this->addStatusToList($parsedString['status']);
+			$this->tryToAddSpider($parsedString['userAgent']);
+			$this->trafficCount += $parsedString['traffic']; 
 			
-			$currentString = fgets($this->openedFile); // Получаем следующую строку
+			$currentString = fgets($this->openedFile);
 		}
 		
-		/* Оставляем только уникальные значения IP и url */
 		$this->uniqueIpList = array_unique($this->uniqueIpList);
 		$this->uniqueUrlList = array_unique($this->uniqueUrlList);
+		
 		fclose($this->openedFile); 
 	}
 	
-	/* Вспомогательная функция, для хранения IP в формате числа */
-	private function convertIpToInt ($ip)
+	// Вспомогательная функция, для хранения IP в формате числа
+	/**
+	* @param string $ip
+	* @return int
+	*/
+	private function convertIpToInt (string $ip)
 	{
 		$ipPart = explode('.', $ip);
-		return $ipPart[0] * 16777216
+		$result = $ipPart[0] * 16777216
 			+ $ipPart[1] * 65536
             + $ipPart[2] * 256
             + $ipPart[3];
+		return $result;
 	}
 	
-	/* Вспомогательная функция, для определения является ли посетитель поисковым ботом */
-	private function isSpider($userAgent)
+	// Вспомогательная функция, для определения является ли посетитель поисковым ботом
+	/**
+	* @param string $userAgent
+	* @return bool
+	*/
+	private function isSpider(string $userAgent)
 	{
 		$isBot = false;
 		
@@ -139,17 +204,23 @@ class Parser
 }
 
 // Для запуска из под командной строки
-if (isset($argv[1])) 
+if (count($argv) > 1) 
 {
-	$limit = (isset($argv[2]) ?  $argv[2] : PHP_INT_MAX); // Если передан лимит на количество обрабатываемых строк
-	$parser = new Parser($argv[1], $limit); // Парсер отрабатывает сразу на старте
-	$parser->jsonPrint(); // Выводим в формате, который требовался, можно добавить, скажем, функцию с serialize выводом, вместо json
+	$filePath = $argv[1];
+	$limit = (count($argv) > 2 ?  $argv[2] : PHP_INT_MAX); // Если передан лимит на количество обрабатываемых строк
+	$parser = new Parser($filePath, $limit); // Парсер отрабатывает сразу на старте
+	$output = $parser->makeJsonOutput(); // Выводим в формате, который требовался, можно добавить, скажем, функцию с serialize выводом, вместо json
+	
+	echo $output;
 }
 
 // Передача параметров через GET
-if (isset($_GET['file'])) 
+if (array_key_exists('file', $_GET)) 
 {
-	$limit = (isset($_GET['limit']) ? $_GET['limit'] : PHP_INT_MAX); // Если передан лимит на количество обрабатываемых строк
-	$parser = new Parser($_GET['file'], $limit); // Парсер отрабатывает сразу на старте
-	$parser->jsonPrint(); // Выводим в формате, который требовался, можно добавить, скажем, функцию с serialize выводом, вместо json
+	$filePath = $_GET['file'];
+	$limit = (array_key_exists('limit', $_GET) ? $_GET['limit'] : PHP_INT_MAX); // Если передан лимит на количество обрабатываемых строк
+	$parser = new Parser($filePath, $limit); // Парсер отрабатывает сразу на старте
+	$output = $parser->makeJsonOutput(); // Выводим в формате, который требовался, можно добавить, скажем, функцию с serialize выводом, вместо json
+	
+	echo $output;
 }
