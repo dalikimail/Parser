@@ -1,8 +1,7 @@
 <?php
 /**
-* Parser
-*
-* 22 May 2018
+* Parser for access.log 
+* ver. 0.1 (22 May 2018)
 *
 * Поиск ведется по четырем группам
 * (A|B|C|D)
@@ -42,10 +41,10 @@ class Parser
 	{
 		$jsonResult = [];
 		
-		$jsonResult['viewsCount'] = $this->viewsCount;
+		$jsonResult['views'] = $this->viewsCount;
 		$jsonResult['urls'] = count($this->uniqueUrlList);
 		$jsonResult['ips'] = count($this->uniqueIpList);
-		$jsonResult['trafficCount'] = $this->trafficCount;
+		$jsonResult['traffic'] = $this->trafficCount;
 		$jsonResult['crawlers'] = $this->spidersList;
 		$jsonResult['statusCodes'] = $this->statusList;
 		
@@ -134,7 +133,7 @@ class Parser
 	{
 		$currentString = fgets($this->openedFile);
 		
-		while ($currentString !== FALSE && $this->viewsCount < $this->stringsLimit) 
+		while ($currentString && $this->viewsCount < $this->stringsLimit) 
 		{
 			$parsedString = $this->parseString($currentString);
 			
